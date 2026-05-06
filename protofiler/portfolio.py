@@ -2,17 +2,20 @@
 
 from decimal import Decimal
 
-from protofiler.models import Portfolio, Position, Sector, SectorSnapshot
+from protofiler.models import AccountSummary, Portfolio, Position, Sector, SectorSnapshot
 
 _UNASSIGNED = "Unassigned"
 
 
-def aggregate(positions_by_broker: dict[str, list[Position]]) -> Portfolio:
+def aggregate(
+    positions_by_broker: dict[str, list[Position]],
+    summaries: list[AccountSummary] | None = None,
+) -> Portfolio:
     """Flatten all broker positions into a single Portfolio."""
     all_positions: list[Position] = []
     for positions in positions_by_broker.values():
         all_positions.extend(positions)
-    return Portfolio(positions=all_positions)
+    return Portfolio(positions=all_positions, account_summaries=summaries or [])
 
 
 def sector_stats(portfolio: Portfolio, sectors: list[Sector]) -> list[SectorSnapshot]:

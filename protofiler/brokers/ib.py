@@ -6,7 +6,7 @@ import ib_insync
 
 from protofiler.brokers.base import BrokerBase
 from protofiler.config import get
-from protofiler.models import AssetType, Position
+from protofiler.models import AccountSummary, AssetType, Position
 
 _SECTYPE_MAP: dict[str, AssetType] = {
     "STK": AssetType.STOCK,
@@ -53,6 +53,40 @@ class IBBroker(BrokerBase):
     @property
     def name(self) -> str:
         return "ib"
+
+    def _connect(self) -> ib_insync.IB:
+        ib = ib_insync.IB()
+        ib.connect(self._host, self._port, clientId=self._client_id)
+        return ib
+
+    def fetch_account_summary(self) -> AccountSummary:
+        ib = self._connect()
+        try:
+            values = ib.accountValues()
+            index: dict[str, str] = {v.tag: v.value for v in values if v.currency != "BASE"}
+
+            def dec(tag: str) -> Decimal:
+                raw = index.get(tag, "0")
+                try:
+                    return Decimal(raw)
+                except Exception:
+                    return Decimal(0)
+
+            return AccountSummary(
+                broker=self.name,
+                net_liquidation=dec("NetLiquidation"),
+                total_cash=dec("TotalCashValue"),
+                gross_position_value=dec("GrossPositionValue"),
+                unrealized_pnl=dec("UnrealizedPnL"),
+                currency=next((v.currency for v in values if v.tag == "NetLiquidation"), "USD"),
+            )
+        except OSError as exc:
+            raise ConnectionError(
+                f"Cannot connect to IB at {self._host}:{self._port} — {exc}"
+            ) from exc
+        finally:
+            if ib.isConnected():
+                ib.disconnect()
 
     def fetch_positions(self) -> list[Position]:
         ib = ib_insync.IB()

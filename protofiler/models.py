@@ -55,10 +55,22 @@ class SectorSnapshot(BaseModel):
     positions: list[Position] = []
 
 
+class AccountSummary(BaseModel):
+    """Key account-level figures from a broker."""
+
+    broker: str
+    net_liquidation: Decimal = Decimal(0)
+    total_cash: Decimal = Decimal(0)       # negative = margin debt owed
+    gross_position_value: Decimal = Decimal(0)
+    unrealized_pnl: Decimal = Decimal(0)
+    currency: str = "USD"
+
+
 class Portfolio(BaseModel):
     """Aggregated view of all positions across brokers."""
 
     positions: list[Position] = []
+    account_summaries: list[AccountSummary] = []
 
     @computed_field
     @property

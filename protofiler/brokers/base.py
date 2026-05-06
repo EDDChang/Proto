@@ -1,8 +1,9 @@
 """Abstract base class for broker connectors."""
 
 from abc import ABC, abstractmethod
+from typing import Optional
 
-from protofiler.models import Position
+from protofiler.models import AccountSummary, Position
 
 
 class BrokerBase(ABC):
@@ -17,6 +18,14 @@ class BrokerBase(ABC):
             RuntimeError: for unexpected API errors.
         """
         ...
+
+    def fetch_account_summary(self) -> Optional[AccountSummary]:
+        """Return account-level figures (cash, margin, PnL).
+
+        Returns None if the broker does not support account summaries.
+        Brokers that support this should override this method.
+        """
+        return None
 
     @property
     @abstractmethod

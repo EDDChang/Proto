@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.table import Table
 from rich import box
 
-from protofiler.models import Portfolio, SectorSnapshot
+from protofiler.models import AccountSummary, Portfolio, SectorSnapshot
 
 console = Console()
 
@@ -81,6 +81,32 @@ def render_sector_stats(snapshots: list[SectorSnapshot], total_value: Decimal) -
         )
 
     table.caption = f"Total: {total_value:,.2f}"
+    console.print(table)
+
+
+def render_account_summaries(summaries: list[AccountSummary]) -> None:
+    """Display account-level cash and margin figures."""
+    table = Table(title="Account Summary", box=box.ROUNDED, show_lines=False)
+    table.add_column("Broker", style="magenta", no_wrap=True)
+    table.add_column("Net Liq", justify="right", style="green", no_wrap=True)
+    table.add_column("Cash", justify="right", no_wrap=True)
+    table.add_column("Positions", justify="right", no_wrap=True)
+    table.add_column("Unrealized PnL", justify="right", no_wrap=True)
+    table.add_column("CCY", no_wrap=True)
+
+    for s in summaries:
+        cash_style = "red" if s.total_cash < Decimal(0) else "white"
+        pnl_style = "green" if s.unrealized_pnl >= Decimal(0) else "red"
+        pnl_sign = "+" if s.unrealized_pnl >= Decimal(0) else ""
+        table.add_row(
+            s.broker,
+            _fmt(s.net_liquidation),
+            f"[{cash_style}]{_fmt(s.total_cash)}[/{cash_style}]",
+            _fmt(s.gross_position_value),
+            f"[{pnl_style}]{pnl_sign}{_fmt(s.unrealized_pnl)}[/{pnl_style}]",
+            s.currency,
+        )
+
     console.print(table)
 
 

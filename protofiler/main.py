@@ -63,16 +63,22 @@ def fetch(
 
     broker_instances = _build_brokers(brokers)
     positions_by_broker: dict[str, list] = {}
+    summaries = []
 
     for broker in broker_instances:
         typer.echo(f"Fetching from {broker.name}…")
         try:
             positions_by_broker[broker.name] = broker.fetch_positions()
+            summary = broker.fetch_account_summary()
+            if summary:
+                summaries.append(summary)
         except (ConnectionError, RuntimeError) as exc:
             err_console.print(f"[{broker.name}] {exc}")
 
-    portfolio = pf.aggregate(positions_by_broker)
+    portfolio = pf.aggregate(positions_by_broker, summaries)
     display.render_positions(portfolio)
+    if portfolio.account_summaries:
+        display.render_account_summaries(portfolio.account_summaries)
 
 
 def _detect_configured_brokers() -> list[str]:
