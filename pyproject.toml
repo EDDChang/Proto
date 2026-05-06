@@ -14,7 +14,6 @@ dependencies = [
     "pydantic>=2",
     "ib_insync>=0.9",
     "shioaji>=1.1",
-    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]

@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
-import os
 from typing import Annotated
 
 import typer
-from dotenv import load_dotenv
 from rich.console import Console
 
 from protofiler.brokers import BROKER_REGISTRY
 from protofiler.brokers.base import BrokerBase
+from protofiler.config import get
 import protofiler.portfolio as pf
 import protofiler.store as store
 import protofiler.display as display
-
-load_dotenv()
 
 app = typer.Typer(
     name="protofiler",
@@ -80,9 +77,9 @@ def fetch(
 
 def _detect_configured_brokers() -> list[str]:
     detected: list[str] = []
-    if os.environ.get("IB_HOST") or os.environ.get("IB_PORT"):
+    if get("ib", "host") or get("ib", "port"):
         detected.append("ib")
-    if os.environ.get("SINOPAC_API_KEY"):
+    if get("sinopac", "api_key"):
         detected.append("sinopac")
     return detected
 

@@ -18,11 +18,25 @@ pip install -e ".[dev]"
 
 ## Configuration
 
-Copy `.env.example` to `.env` and fill in your credentials:
+Credentials are stored in `~/.protofiler/config.toml` — outside the repository so they are never accidentally committed.
 
-```bash
-cp .env.example .env
+```toml
+# ~/.protofiler/config.toml
+
+[ib]
+host = "127.0.0.1"
+port = 7497        # 7497 = paper trading, 7496 = live
+client_id = 1
+
+[sinopac]
+api_key = "your_api_key"
+secret_key = "your_secret_key"
+ca_path = "/path/to/ca.pfx"   # required for futures
+ca_passwd = "your_ca_password"
+person_id = "A123456789"
 ```
+
+Environment variables (e.g. `IB_HOST`, `SINOPAC_API_KEY`) take precedence over the config file if both are set. See `.env.example` for the full list of variable names.
 
 ## Usage
 

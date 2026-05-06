@@ -1,11 +1,11 @@
 """Sinopac (永豐證券/期貨) connector using the shioaji SDK."""
 
-import os
 from decimal import Decimal
 
 import shioaji as sj
 
 from protofiler.brokers.base import BrokerBase
+from protofiler.config import get
 from protofiler.models import AssetType, Position
 
 
@@ -19,12 +19,12 @@ def _futures_or_options(contract: sj.contracts.BaseContract) -> AssetType:
 class SinopacBroker(BrokerBase):
     """Connects to Sinopac via the shioaji SDK.
 
-    Environment variables:
-        SINOPAC_API_KEY     — API key from the Sinopac developer portal
-        SINOPAC_SECRET_KEY  — Secret key
-        SINOPAC_CA_PATH     — Path to the CA certificate file (for futures)
-        SINOPAC_CA_PASSWD   — CA certificate password
-        SINOPAC_PERSON_ID   — National ID / person ID for CA authentication
+    Config (env var or ~/.protofiler/config.toml [sinopac] section):
+        api_key     — API key from the Sinopac developer portal
+        secret_key  — Secret key
+        ca_path     — Path to the CA certificate file (required for futures)
+        ca_passwd   — CA certificate password
+        person_id   — National ID / person ID for CA authentication
     """
 
     def __init__(
@@ -36,11 +36,11 @@ class SinopacBroker(BrokerBase):
         person_id: str | None = None,
         simulation: bool = False,
     ) -> None:
-        self._api_key = api_key or os.environ.get("SINOPAC_API_KEY", "")
-        self._secret_key = secret_key or os.environ.get("SINOPAC_SECRET_KEY", "")
-        self._ca_path = ca_path or os.environ.get("SINOPAC_CA_PATH", "")
-        self._ca_passwd = ca_passwd or os.environ.get("SINOPAC_CA_PASSWD", "")
-        self._person_id = person_id or os.environ.get("SINOPAC_PERSON_ID", "")
+        self._api_key = api_key or get("sinopac", "api_key", "")
+        self._secret_key = secret_key or get("sinopac", "secret_key", "")
+        self._ca_path = ca_path or get("sinopac", "ca_path", "")
+        self._ca_passwd = ca_passwd or get("sinopac", "ca_passwd", "")
+        self._person_id = person_id or get("sinopac", "person_id", "")
         self._simulation = simulation
 
     @property

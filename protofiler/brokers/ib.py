@@ -1,11 +1,11 @@
 """Interactive Brokers connector using ib_insync."""
 
-import os
 from decimal import Decimal
 
 import ib_insync
 
 from protofiler.brokers.base import BrokerBase
+from protofiler.config import get
 from protofiler.models import AssetType, Position
 
 # Mapping from IB secType string to our AssetType enum
@@ -24,10 +24,10 @@ def _to_asset_type(sec_type: str) -> AssetType:
 class IBBroker(BrokerBase):
     """Connects to TWS / IB Gateway via the ib_insync library.
 
-    Environment variables:
-        IB_HOST  — TWS/Gateway host (default: 127.0.0.1)
-        IB_PORT  — TWS/Gateway port (default: 7497 for paper, 7496 for live)
-        IB_CLIENT_ID — unique client ID (default: 1)
+    Config (env var or ~/.protofiler/config.toml [ib] section):
+        host       — TWS/Gateway host (default: 127.0.0.1)
+        port       — TWS/Gateway port (default: 7497 for paper, 7496 for live)
+        client_id  — unique client ID (default: 1)
     """
 
     def __init__(
@@ -36,9 +36,9 @@ class IBBroker(BrokerBase):
         port: int | None = None,
         client_id: int | None = None,
     ) -> None:
-        self._host = host or os.environ.get("IB_HOST", "127.0.0.1")
-        self._port = int(port or os.environ.get("IB_PORT", 7497))
-        self._client_id = int(client_id or os.environ.get("IB_CLIENT_ID", 1))
+        self._host = host or get("ib", "host", "127.0.0.1")
+        self._port = int(port or get("ib", "port", 7497))
+        self._client_id = int(client_id or get("ib", "client_id", 1))
 
     @property
     def name(self) -> str:

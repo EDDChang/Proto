@@ -47,4 +47,4 @@ CLI (main.py)
 
 **Sector persistence** (`store.py`): sectors are stored as `~/.protofiler/sectors.json` — a flat `{name: [symbols]}` dict. `store.py` exposes `load / save / add_sector / remove_sector / assign_symbol / unassign_symbol`.
 
-**Credentials** are read from environment variables (`.env` via `python-dotenv`). See `.env.example` for all required variable names per broker.
+**Credentials** (`config.py`): this is a public repo, so credentials are never stored in the repository. Config is loaded from `~/.protofiler/config.toml` (TOML, outside the repo) with environment variables taking precedence. `config.get(section, key)` is the single call site used by all brokers. `.env.example` documents available keys only — it is not loaded at runtime.
