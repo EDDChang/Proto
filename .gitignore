@@ -27,3 +27,4 @@ htmlcov/
 
 # Ruff cache
 .ruff_cache/
+shioaji.log
