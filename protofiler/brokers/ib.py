@@ -8,7 +8,6 @@ from protofiler.brokers.base import BrokerBase
 from protofiler.config import get
 from protofiler.models import AssetType, Position
 
-# Mapping from IB secType string to our AssetType enum
 _SECTYPE_MAP: dict[str, AssetType] = {
     "STK": AssetType.STOCK,
     "FUT": AssetType.FUTURES,
@@ -19,6 +18,13 @@ _SECTYPE_MAP: dict[str, AssetType] = {
 
 def _to_asset_type(sec_type: str) -> AssetType:
     return _SECTYPE_MAP.get(sec_type.upper(), AssetType.OTHER)
+
+
+def _nan_safe(value: float | None) -> float | None:
+    """Return None for NaN floats that ib_insync uses as 'not available'."""
+    if value is None:
+        return None
+    return None if value != value else value
 
 
 class IBBroker(BrokerBase):
@@ -48,8 +54,23 @@ class IBBroker(BrokerBase):
         ib = ib_insync.IB()
         try:
             ib.connect(self._host, self._port, clientId=self._client_id)
+
             raw_positions = ib.positions()
-            return [self._map_position(p) for p in raw_positions]
+            if not raw_positions:
+                return []
+
+            # Qualify contracts so conId is populated (required for reqTickers)
+            contracts = [pos.contract for pos in raw_positions]
+            ib.qualifyContracts(*contracts)
+
+            # Single batch snapshot request — much faster than one-per-position
+            tickers = ib.reqTickers(*contracts)
+            price_map: dict[int, ib_insync.Ticker] = {
+                t.contract.conId: t for t in tickers
+            }
+
+            return [self._map_position(pos, price_map) for pos in raw_positions]
+
         except OSError as exc:
             raise ConnectionError(
                 f"Cannot connect to IB at {self._host}:{self._port} — {exc}"
@@ -58,28 +79,22 @@ class IBBroker(BrokerBase):
             if ib.isConnected():
                 ib.disconnect()
 
-    def _map_position(self, pos: ib_insync.Position) -> Position:
+    def _map_position(
+        self,
+        pos: ib_insync.Position,
+        price_map: dict[int, ib_insync.Ticker],
+    ) -> Position:
         contract = pos.contract
         avg_cost = Decimal(str(pos.avgCost))
         qty = Decimal(str(pos.position))
 
-        # IB does not provide live market price in the positions snapshot;
-        # request market data for each contract to get the last price.
-        ib = ib_insync.IB()
-        market_price = avg_cost  # fallback
-        try:
-            ib.connect(self._host, self._port, clientId=self._client_id + 100)
-            ticker = ib.reqMktData(contract, "", True, False)
-            ib_insync.util.sleep(1)
-            if ticker.last and ticker.last == ticker.last:  # NaN check
-                market_price = Decimal(str(ticker.last))
-            elif ticker.close and ticker.close == ticker.close:
-                market_price = Decimal(str(ticker.close))
-        except Exception:
-            pass
-        finally:
-            if ib.isConnected():
-                ib.disconnect()
+        market_price = avg_cost  # fallback if no market data
+        ticker = price_map.get(contract.conId)
+        if ticker:
+            # Prefer last trade price, fall back to previous close
+            price = _nan_safe(ticker.last) or _nan_safe(ticker.close)
+            if price is not None:
+                market_price = Decimal(str(price))
 
         return Position(
             symbol=contract.localSymbol or contract.symbol,
