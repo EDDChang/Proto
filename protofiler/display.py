@@ -1,6 +1,7 @@
 """Rich-based terminal rendering for portfolio and sector views."""
 
 from decimal import Decimal
+from typing import Union
 
 from rich.console import Console
 from rich.table import Table
@@ -11,38 +12,43 @@ from protofiler.models import Portfolio, SectorSnapshot
 console = Console()
 
 
+def _fmt(value: Decimal) -> str:
+    """Compact number format: K suffix >= 1,000, 2 dp below that."""
+    f = float(value)
+    if abs(f) >= 1_000:
+        return f"{f/1000:,.2f}K"
+    return f"{f:,.2f}"
+
+
 def render_positions(portfolio: Portfolio) -> None:
     """Display all positions in a formatted table."""
     table = Table(
         title="Portfolio Positions",
         box=box.ROUNDED,
         show_lines=False,
+        expand=False,
     )
-    table.add_column("Symbol", style="cyan", no_wrap=True)
-    table.add_column("Name", style="white")
-    table.add_column("Type", style="yellow")
-    table.add_column("Broker", style="magenta")
-    table.add_column("Qty", justify="right")
-    table.add_column("Avg Cost", justify="right")
-    table.add_column("Market Price", justify="right")
-    table.add_column("Market Value", justify="right", style="green")
-    table.add_column("PnL", justify="right")
+    table.add_column("Symbol", style="cyan", no_wrap=True, max_width=22)
+    table.add_column("T", style="yellow", no_wrap=True)   # asset type initial
+    table.add_column("Qty", justify="right", no_wrap=True, min_width=6)
+    table.add_column("Avg", justify="right", no_wrap=True)
+    table.add_column("Price", justify="right", no_wrap=True)
+    table.add_column("Value", justify="right", style="green", no_wrap=True)
+    table.add_column("PnL", justify="right", no_wrap=True)
 
     for pos in portfolio.positions:
         pnl = pos.unrealized_pnl
-        pnl_str = f"{pnl:,.2f}"
         pnl_style = "green" if pnl >= Decimal(0) else "red"
 
+        pnl_sign = "+" if pnl >= Decimal(0) else ""
         table.add_row(
             pos.symbol,
-            pos.name or "",
-            pos.asset_type.value,
-            pos.broker,
+            pos.asset_type.value[0].upper(),  # S / F / O / C
             f"{pos.quantity:,}",
-            f"{pos.avg_cost:,.4f}",
-            f"{pos.market_price:,.4f}",
-            f"{pos.market_value:,.2f}",
-            f"[{pnl_style}]{pnl_str}[/{pnl_style}]",
+            _fmt(pos.avg_cost),
+            _fmt(pos.market_price),
+            _fmt(pos.market_value),
+            f"[{pnl_style}]{pnl_sign}{_fmt(pnl)}[/{pnl_style}]",
         )
 
     table.caption = f"Total Market Value: {portfolio.total_market_value:,.2f}"

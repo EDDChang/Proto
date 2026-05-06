@@ -20,11 +20,15 @@ def _to_asset_type(sec_type: str) -> AssetType:
     return _SECTYPE_MAP.get(sec_type.upper(), AssetType.OTHER)
 
 
-def _nan_safe(value: float | None) -> float | None:
-    """Return None for NaN floats that ib_insync uses as 'not available'."""
+def _valid_price(value: float | None) -> float | None:
+    """Return None for IB sentinel values: NaN and -1 both mean 'not available'."""
     if value is None:
         return None
-    return None if value != value else value
+    if value != value:  # NaN check
+        return None
+    if value < 0:
+        return None
+    return value
 
 
 class IBBroker(BrokerBase):
@@ -63,6 +67,9 @@ class IBBroker(BrokerBase):
             contracts = [pos.contract for pos in raw_positions]
             ib.qualifyContracts(*contracts)
 
+            # Fall back to delayed data (type 3) when live subscription is unavailable
+            ib.reqMarketDataType(3)
+
             # Single batch snapshot request — much faster than one-per-position
             tickers = ib.reqTickers(*contracts)
             price_map: dict[int, ib_insync.Ticker] = {
@@ -88,18 +95,30 @@ class IBBroker(BrokerBase):
         avg_cost = Decimal(str(pos.avgCost))
         qty = Decimal(str(pos.position))
 
-        market_price = avg_cost  # fallback if no market data
+        # Options are quoted per-share; multiply by contract multiplier to get
+        # per-contract value so that market_value = quantity * market_price is correct.
+        multiplier = Decimal(str(contract.multiplier)) if contract.multiplier else Decimal(1)
+
+        # IB avgCost for options is already the total per-contract cost (premium × multiplier).
+        # Normalise to per-share so our model stays consistent: value = qty × price.
+        if contract.secType == "OPT":
+            avg_cost_per_unit = avg_cost  # already per-contract total
+        else:
+            avg_cost_per_unit = avg_cost
+            multiplier = Decimal(1)
+
+        market_price = avg_cost_per_unit  # fallback if no market data
         ticker = price_map.get(contract.conId)
         if ticker:
             # Prefer last trade price, fall back to previous close
-            price = _nan_safe(ticker.last) or _nan_safe(ticker.close)
-            if price is not None:
-                market_price = Decimal(str(price))
+            raw = _valid_price(ticker.last) or _valid_price(ticker.close)
+            if raw is not None:
+                market_price = Decimal(str(raw)) * multiplier
 
         return Position(
             symbol=contract.localSymbol or contract.symbol,
             quantity=qty,
-            avg_cost=avg_cost,
+            avg_cost=avg_cost_per_unit,
             market_price=market_price,
             asset_type=_to_asset_type(contract.secType),
             broker=self.name,
